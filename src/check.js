@@ -65,18 +65,20 @@ function mdwPublishCheck(markdown, settings, article) {
 
   // 把代码块内容抹成空格，保留行号，避免代码里的链接被误判
   const masked = source.replace(/```[\s\S]*?```/g, (block) => block.replace(/[^\n]/g, ' '))
+  // 图片语法本身也带 []()，扫描链接前先抹掉，避免把图片误报成外链
+  const maskedLinks = masked.replace(/!\[[^\]]*\]\([^)]*\)/g, (block) => block.replace(/[^\n]/g, ' '))
 
   // 空链接 / 外链
   const externalLinks = []
   const linkPattern = /\[([^\]]*)\]\(([^)\s]*)(?:\s+"[^"]*")?\)/g
-  let linkMatch = linkPattern.exec(masked)
+  let linkMatch = linkPattern.exec(maskedLinks)
   while (linkMatch !== null) {
     const label = linkMatch[1].trim()
     const href = linkMatch[2].trim()
     const line = lineOf(linkMatch.index)
     if (href === '' || label === '') push('warn', '空链接', '第 ' + line + ' 行的链接缺少文字或地址。', line)
     else if (/^https?:\/\//i.test(href)) externalLinks.push({ line, href })
-    linkMatch = linkPattern.exec(masked)
+    linkMatch = linkPattern.exec(maskedLinks)
   }
   if (externalLinks.length > 0 && settings.linkRefs === false) {
     push(

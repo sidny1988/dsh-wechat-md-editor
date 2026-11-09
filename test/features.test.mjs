@@ -64,6 +64,9 @@ assert.equal(clean.length, 0, '干净文章不应有告警：' + JSON.stringify(
 const localImage = publishCheck('# 标题\n\n![图](/md-workbench/image/a.png)\n', { linkRefs: true, imageProvider: 'local' }, null)
 assert.ok(localImage.some((issue) => issue.title === '本地图片在公众号可能不显示'), '应提示本地图片')
 
+const imageOnly = publishCheck('# 标题\n\n![图](https://example.com/a.png)\n', { linkRefs: false, imageProvider: 'local' }, null)
+assert.equal(imageOnly.some((issue) => issue.title === '外链在公众号里不可点击'), false, '图片不应被误报为外链')
+
 const tableMismatch = publishCheck('# 标题\n\n| A | B |\n| --- | --- |\n| 1 | 2 | 3 |\n', { linkRefs: true, imageProvider: 'local' }, null)
 assert.ok(tableMismatch.some((issue) => issue.title === '表格列数不一致'), '应发现表格列数不一致')
 
