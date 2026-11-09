@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>公众号MD编辑器 · 视觉验收</title>
+<style>
+  html, body, #app { height: 100%; margin: 0; background: #f6f3ed; }
+  #app { display: flex; flex-direction: column; }
+  #app > .mw-root { flex: 1; min-height: 0; }
+</style>
+<script src="../node_modules/react/umd/react.development.js"></script>
+<script src="../node_modules/react-dom/umd/react-dom.development.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const CONTENT = [
+    '# 把一篇长文，排成公众号该有的样子',
+    '',
+    '写作最难的部分从来不是排版，但排版最影响读者是否愿意读下去。公众号MD编辑器把这件事压缩成三件事：**写**、**看**、**粘贴**。',
+    '',
+    '> 左边是 Markdown，右边是它进入公众号之后的样子。所有样式在复制的那一刻被逐条写进元素，不依赖任何外部样式表。',
+    '',
+    '## 一、为什么需要「所见即所得」',
+    '',
+    '公众号编辑器会清洗 `class` 与 `<style>`，只保留行内样式。于是 Markdown 编辑器普遍走两条路：要么复制过去样式全丢，要么复制一张图。',
+    '',
+    '1. 先在本地把样式算清楚；',
+    '2. 复制时按选择器特异性，把每条 CSS 落到对应元素的 `style` 上；',
+    '3. 粘贴进公众号，样式原样保留。',
+    '',
+    '### 关键细节：链接要转成脚注',
+    '',
+    '公众号正文不支持外链。开启「参考链接」后，正文里的 [Doocs 编辑器](https://github.com/doocs/md) 会变成上标序号，文末自动汇总地址：',
+    '',
+    '- 正文保持干净，不出现一长串 URL；',
+    '- 读者仍能在文末找到出处；',
+    '- 复制时一并生成，不需要二次整理。',
+    '',
+    '## 二、代码块也得好看',
+    '',
+    '技术文章里，代码块是最容易露怯的地方。公众号MD编辑器内置 6 套代码配色，带 mac 圆点与语言标签：',
+    '',
+    '```js',
+    'const theme = pick("classic")',
+    'const html = render(markdown, theme)',
+    'clipboard.write(inline(html, theme.css))',
+    '```',
+    '',
+    '```python',
+    'def inline_styles(root, css):',
+    '    for rule in parse(css):',
+    '        for node in root.query_selector_all(rule.selector):',
+    '            node.apply(rule.declarations)',
+    '```',
+    '',
+    '## 三、表格与清单',
+    '',
+    '| 能力 | 说明 | 状态 |',
+    '| --- | --- | --- |',
+    '| 主题 | 12 套，3 套移植自 doocs | 可用 |',
+    '| 代码 | 6 套配色 × 8 类语言 | 可用 |',
+    '| 复制 | 内联样式 + 兼容模式回退 | 可用 |',
+    '',
+    '- [x] 主题样式库',
+    '- [x] 复制到公众号',
+    '- [ ] Mermaid 图表',
+    '',
+    '## 四、然后呢',
+    '',
+    '写完之后，点右上角「复制到公众号」，切到公众号后台，`Ctrl+V`。剩下的事情只有一个：起一个不辜负正文的标题。',
+    '',
+    '[TOC]',
+    '',
+    '## 五、公式、图表与组件',
+    '',
+    '质能方程 $E = mc^2$，块级公式：',
+    '',
+    '$$',
+    '\\int_a^b f(x)\\,dx = F(b) - F(a)',
+    '$$',
+    '',
+    '```mermaid',
+    'flowchart LR',
+    '  A[写作] --> B[排版]',
+    '  B --> C[复制]',
+    '  C --> D[公众号]',
+    '```',
+    '',
+    '<TipBlock type="warn" title="注意" text="复制到公众号时，公式与图表会自动转成图片。" />',
+    '',
+    '<QRCodeBlock url="https://example.com" text="扫码访问" size="120" />',
+  ].join('\n')
+
+  const SETTINGS = {
+    themeId: 'classic', codeThemeId: 'github-dark', fontFamily: 'system', fontSize: 16, lineHeight: 1.75,
+    paragraphSpacing: 16, letterSpacing: 0.4, textAlign: 'left', indent: false, softBreaks: true, linkRefs: true,
+    pagePadding: 20, previewMode: 'split', splitRatio: 0.52, docRail: true, imageProvider: 'local', autoUpload: false,
+    uploadUrl: '', uploadField: 'file', uploadHeaders: '', uploadPath: 'data.url', githubRepo: '', githubToken: '',
+    githubPath: 'images', githubBranch: 'main', cloudName: '', cloudPreset: '', customCss: '', codeLineNumbers: false,
+    scrollSync: true, articleWidth: '375', showStats: true, accent: '',
+    surface: 'glass', accentSource: 'ink', motion: true, railWidth: 232,
+  }
+
+  const state = {
+    ok: true,    revision: 1,
+    settings: SETTINGS,
+    order: ['d1', 'd2', 'd3'],
+    activeId: 'd1',
+    docs: [
+      { id: 'd1', title: '把一篇长文，排成公众号该有的样子', createdAt: Date.now() - 86400000, updatedAt: Date.now() - 60000, chars: 486 },
+      { id: 'd2', title: '第 42 期周报：把复杂留给自己', createdAt: Date.now() - 172800000, updatedAt: Date.now() - 7200000, chars: 1220 },
+      { id: 'd3', title: '读书笔记 ·《写作这回事》', createdAt: Date.now() - 259200000, updatedAt: Date.now() - 86400000, chars: 830 },
+    ],
+    active: { id: 'd1', title: '把一篇长文，排成公众号该有的样子', createdAt: Date.now() - 86400000, updatedAt: Date.now() - 60000, chars: 486, content: CONTENT },
+  }
+
+  window.fetch = async (url, init) => {
+    const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : {}
+    const json = (payload) => ({ ok: true, status: 200, json: async () => payload })
+    if (String(url).endsWith('/state')) return json(state)
+    if (String(url).endsWith('/act')) {
+      if (body.action === 'settings.save') {
+        window.__ACTS__ = window.__ACTS__ || []
+        window.__ACTS__.push(body.settings)
+        state.settings = { ...state.settings, ...body.settings }
+      }
+      if (body.action === 'doc.save') { state.active.content = body.content; state.active.title = body.title }
+      return json({ ok: true, savedAt: Date.now(), state })
+    }
+    return json({ ok: true, url: '/plugins/dsh-md-workbench/image/img-demo.png' })
+  }
+
+  let definition = null
+  window.__ModuleLoader__ = { load(d) { definition = d } }
+</script>
+<script src="../client.js"></script>
+<script>
+  const plugin = definition.factory((id) => (id === 'react' ? React : {}))
+  const registry = {}
+  plugin.apply({
+    slots: {
+      inject(seat, factory) { factory(); return () => {} },
+      register(options, component) { registry[options.key === undefined ? options.id : options.key] = component; return () => {} },
+    },
+    get(name) { return name === 'layout' ? { selectPanel() {} } : undefined },
+  })
+  ;(function applyBigDocument() {
+    const params = new URLSearchParams(location.search)
+    if (params.get('railw')) state.settings.railWidth = Number(params.get('railw'))
+    if (params.get('split')) state.settings.splitRatio = Number(params.get('split'))
+    if (params.get('surface')) state.settings.surface = params.get('surface')
+    if (params.get('accentsrc')) state.settings.accentSource = params.get('accentsrc')
+    if (params.get('motion') === '0') state.settings.motion = false
+    if (params.get('wall') === '1' || params.get('wall') === 'light') {
+      const gradient = params.get('wall') === 'light'
+        ? 'radial-gradient(1100px 700px at 18% 8%, #efe7fb 0%, transparent 60%), radial-gradient(900px 700px at 86% 92%, #dcefec 0%, transparent 62%), linear-gradient(135deg, #f7f2e9, #e9eef8 55%, #eef4ea)'
+        : 'radial-gradient(1200px 700px at 16% 6%, #3b2742 0%, transparent 58%), radial-gradient(1000px 820px at 88% 94%, #103c3a 0%, transparent 60%), linear-gradient(135deg, #0d1117, #151b2b 52%, #0a1d1a)'
+      document.documentElement.style.background = gradient
+      document.documentElement.style.backgroundAttachment = 'fixed'
+      document.body.style.background = 'transparent'
+      const appNode = document.getElementById('app')
+      if (appNode !== null) appNode.style.background = 'transparent'
+    }
+    if (params.get('hostaccent')) document.documentElement.style.setProperty('--dsw-alias-brand-primary', params.get('hostaccent'))
+    if (params.get('we') === '1') {
+      document.body.setAttribute('data-we-wallpaper', 'on')
+      document.body.setAttribute('data-we-glass-page', '')
+      document.body.style.setProperty('--dsw-alias-bg-base', 'transparent')
+      if (params.get('dark') === '1') {
+        document.body.setAttribute('data-ds-dark-theme', '')
+        document.body.style.setProperty('--dsw-alias-bg-layer-1', params.get('wecard') || 'rgba(30,29,34,0.45)')
+        document.body.style.setProperty('--dsw-alias-bg-layer-2', params.get('wecard2') || 'rgba(38,37,43,0.55)')
+      } else {
+        document.body.style.setProperty('--dsw-alias-bg-layer-1', params.get('wecard') || 'rgba(255,255,255,0.45)')
+        document.body.style.setProperty('--dsw-alias-bg-layer-2', params.get('wecard2') || 'rgba(255,255,255,0.55)')
+      }
+    }
+    if (params.get('empty') === '1') {
+      state.active.content = ''
+      state.active.chars = 0
+      state.docs[0].chars = 0
+      return
+    }
+    if (params.get('issues') === '1') {
+      state.active.content = [
+        '# 检查演示',
+        '',
+        '[外链](https://example.com) 和 [空链接]()',
+        '',
+        '![本地图](/md-workbench/image/a.png)',
+        '',
+        '```js',
+        'const a = 1',
+        '',
+        '## 没有闭合的代码块',
+      ].join('\n')
+      state.active.chars = state.active.content.length
+      state.docs[0].chars = state.active.chars
+      return
+    }
+    if (params.get('big') !== '1') return
+    const parts = ['# 大文档性能测试', '']
+    for (let i = 1; i <= 120; i += 1) {
+      parts.push('## 第 ' + i + ' 节')
+      parts.push('这是第 ' + i + ' 节正文，包含 **粗体**、*斜体*、`行内代码` 与 [链接](https://example.com/' + i + ')。')
+      parts.push('')
+      if (i % 10 === 0) {
+        parts.push('```js', 'const value = ' + i, 'console.log(value)', '```', '')
+      }
+      if (i % 25 === 0) {
+        parts.push('| 列 A | 列 B |', '| --- | --- |', '| ' + i + ' | 值 |', '')
+      }
+      parts.push('- 列表一', '- 列表二', '')
+    }
+    state.active.content = parts.join('\n')
+    state.active.chars = state.active.content.length
+    state.docs[0].chars = state.active.content.length
+  })()
+
+  ReactDOM.createRoot(document.getElementById('app')).render(React.createElement(registry['md-workbench']))
+
+  if (new URLSearchParams(location.search).get('domcheck') === '1') {
+    setTimeout(() => {
+      const nodes = Array.from(document.querySelectorAll('.mw-paper .mdw-math'))
+      console.log('[domcheck] mathNodes=' + nodes.length + ' children=' + nodes.map((n) => n.childElementCount).join(',') +
+        ' tag=' + nodes.map((n) => (n.firstElementChild ? n.firstElementChild.tagName : '-')).join(',') +
+        ' done=' + nodes.map((n) => n.getAttribute('data-done')).join(','))
+      if (nodes[0]) console.log('[domhtml] ' + nodes[0].innerHTML.slice(0, 260))
+    }, 5000)
+  }
+
+  if (new URLSearchParams(location.search).get('resize') === '1') {
+    setTimeout(async () => {
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+      const fire = (target, type, x, y) =>
+        target.dispatchEvent(new window.PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 1 }))
+      const rail = document.querySelector('.mw-rail')
+      const splitters = Array.from(document.querySelectorAll('.mw-splitter'))
+      const railSplitter = splitters[0]
+      const railRect = railSplitter.getBoundingClientRect()
+      fire(railSplitter, 'pointerdown', railRect.left + 3, railRect.top + 40)
+      fire(document, 'pointermove', 320, railRect.top + 40)
+      fire(document, 'pointerup', 320, railRect.top + 40)
+      await wait(700)
+      const railWidth = Math.round(rail.getBoundingClientRect().width)
+      const railSaved = window.__ACTS__ && window.__ACTS__.length > 0 ? window.__ACTS__[window.__ACTS__.length - 1].railWidth : null
+      // 键盘微调 + 双击复位
+      railSplitter.focus()
+      railSplitter.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+      await wait(700)
+      const keyboardWidth = Math.round(rail.getBoundingClientRect().width)
+      railSplitter.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }))
+      await wait(700)
+      const resetWidth = Math.round(rail.getBoundingClientRect().width)
+      // 左右分栏
+      const body = document.querySelector('.mw-body')
+      const bodyRect = body.getBoundingClientRect()
+      const editorSplitter = document.querySelectorAll('.mw-splitter')[1]
+      const splitRect = editorSplitter.getBoundingClientRect()
+      fire(editorSplitter, 'pointerdown', splitRect.left + 3, splitRect.top + 40)
+      fire(document, 'pointermove', bodyRect.left + railWidth + (bodyRect.width - railWidth) * 0.4, splitRect.top + 40)
+      fire(document, 'pointerup', 0, 0)
+      await wait(700)
+      const editor = document.querySelector('.mw-editor')
+      const editorRatio = Number((editor.style.flexGrow || '0').slice(0, 6))
+      const ratioSaved = window.__ACTS__[window.__ACTS__.length - 1].splitRatio
+      console.log('[resize] ' + JSON.stringify({ railWidth, railSaved, keyboardWidth, resetWidth, editorRatio, ratioSaved }))
+    }, 2600)
+  }
+
+  if (new URLSearchParams(location.search).get('diag') === '1') {
+    setTimeout(() => {
+      const root = document.querySelector('.mw-root')
+      const copy = document.querySelector('.mw-btn--primary')
+      if (root === null) return
+      const rootStyle = getComputedStyle(root)
+      console.log('[diag] ' + JSON.stringify({
+        surface: root.getAttribute('data-surface'),
+        rootBg: rootStyle.backgroundColor,
+        mwBg: rootStyle.getPropertyValue('--mw-bg').trim(),
+        mwCard: rootStyle.getPropertyValue('--mw-card').trim(),
+        copyColor: copy === null ? null : getComputedStyle(copy).color,
+        copyBg: copy === null ? null : getComputedStyle(copy).backgroundColor,
+      }))
+    }, 1800)
+  }
+
+  if (new URLSearchParams(location.search).get('perf') === '1') {
+    setTimeout(async () => {
+      const api = window.__MDW_TEST__
+      if (!api) {
+        console.log('[perf] no api (need mdwdebug=1)')
+        return
+      }
+      if (new URLSearchParams(location.search).get('nocache') === '1') api.rich.setCache(false)
+      const before = api.rich.perf()
+      const durations = []
+      const original = api.rich.hydrate
+      api.rich.hydrate = async (root) => {
+        const started = performance.now()
+        await original(root)
+        durations.push(Math.round(performance.now() - started))
+      }
+      const ta = document.querySelector('.mw-textarea')
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+      const latencies = []
+      const inputMs = []
+      const articleNode = document.querySelector('.mw-paper .mdw-art')
+      for (let i = 0; i < 5; i += 1) {
+        const marker = '追加一行 ' + i
+        const startedAt = performance.now()
+        setter.call(ta, ta.value + '\n\n' + marker)
+        ta.dispatchEvent(new Event('input', { bubbles: true }))
+        await new Promise((resolve) => window.requestAnimationFrame(() => resolve()))
+        inputMs.push(Math.round(performance.now() - startedAt))
+        await new Promise((resolve) => {
+          let done = false
+          const finish = () => {
+            if (done) return
+            done = true
+            observer.disconnect()
+            resolve()
+          }
+          const observer = new MutationObserver(() => {
+            if (articleNode !== null && articleNode.textContent.indexOf(marker) !== -1) finish()
+          })
+          if (articleNode !== null) observer.observe(articleNode, { childList: true, subtree: true, characterData: true })
+          setTimeout(finish, 800)
+        })
+        latencies.push(Math.round(performance.now() - startedAt))
+        await new Promise((resolve) => setTimeout(resolve, 420))
+      }
+      const engineStarted = performance.now()
+      api.engine.render(ta.value, { linkRefs: true, softBreaks: true })
+      const engineMs = Math.round(performance.now() - engineStarted)
+      const after = api.rich.perf()
+      // 直接验证缓存失效：同代码走缓存，改代码必须重新渲染
+      const probe = document.createElement('div')
+      probe.style.cssText = 'position:fixed;left:-10000px;top:0'
+      const diagram = document.createElement('div')
+      diagram.className = 'mdw-mermaid'
+      diagram.setAttribute('data-code', 'flowchart LR\n  X[版本A] --> Y[完成]')
+      probe.appendChild(diagram)
+      document.body.appendChild(probe)
+      const s1 = api.rich.perf()
+      await api.rich.hydrate(probe)
+      const s2 = api.rich.perf()
+      diagram.removeAttribute('data-done')
+      diagram.innerHTML = ''
+      diagram.setAttribute('data-code', 'flowchart LR\n  X[版本B] --> Y[完成]')
+      await api.rich.hydrate(probe)
+      const s3 = api.rich.perf()
+      diagram.removeAttribute('data-done')
+      diagram.innerHTML = ''
+      await api.rich.hydrate(probe)
+      const s4 = api.rich.perf()
+      const probeResult = {
+        firstRender: s2.mermaidRender - s1.mermaidRender,
+        changedRender: s3.mermaidRender - s2.mermaidRender,
+        repeatHit: s4.mermaidHit - s3.mermaidHit,
+        hasSvg: diagram.querySelector('svg') !== null,
+        svgLen: diagram.querySelector('svg') !== null ? diagram.querySelector('svg').outerHTML.length : 0,
+      }
+      const bad = document.createElement('div')
+      bad.className = 'mdw-mermaid'
+      bad.setAttribute('data-code', 'flowchart LR\n  A -->')
+      probe.appendChild(bad)
+      const s5 = api.rich.perf()
+      await api.rich.hydrate(probe)
+      const s6 = api.rich.perf()
+      bad.removeAttribute('data-done')
+      bad.innerHTML = ''
+      await api.rich.hydrate(probe)
+      const s7 = api.rich.perf()
+      probeResult.badFirst = s6.mermaidRender - s5.mermaidRender
+      probeResult.badRepeat = s7.mermaidRender - s6.mermaidRender
+      probeResult.badText = (bad.textContent || '').slice(0, 24)
+      probe.remove()
+      console.log('[perf] ' + JSON.stringify({
+        durations,
+        latencies,
+        inputMs,
+        engineMs,
+        chars: ta.value.length,
+        mermaidRender: after.mermaidRender - before.mermaidRender,
+        mermaidHit: after.mermaidHit - before.mermaidHit,
+        mermaidMs: Math.round(after.mermaidMs - before.mermaidMs),
+        mathRender: after.mathRender - before.mathRender,
+        mathHit: after.mathHit - before.mathHit,
+        probe: probeResult,
+      }))
+    }, 2600)
+  }
+
+  if (new URLSearchParams(location.search).get('selftest') === '1') {
+    setTimeout(async () => {
+      try {
+        const api = window.__MDW_TEST__
+        const md = '# 自检\n\n公式 $a^2+b^2=c^2$ 与块级：\n\n$$\n\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}\n$$\n\n```mermaid\nflowchart LR\nA-->B\n```\n\n<TipBlock type="info" title="提示" text="组件渲染" />\n\n<QRCodeBlock url="https://example.com" text="扫码" />\n'
+        const rendered = api.engine.render(md, { linkRefs: true, softBreaks: true })
+        const css = api.themes.cssFor(api.themes.byId('classic'), { fontFamily: 'system', fontSize: 16, lineHeight: 1.75, paragraphSpacing: 16, letterSpacing: 0.4, textAlign: 'left', indent: false, pagePadding: 20 })
+        const out = await api.rich.materialize(rendered.html, css, { imageProvider: 'local', autoUpload: false })
+        console.log('[selftest] graphics=' + out.graphics + ' uploaded=' + out.uploaded + ' len=' + out.html.length +
+          ' mathImg=' + (out.html.match(/data:image\/png/g) || []).length +
+          ' hasMathPlaceholder=' + out.html.includes('mdw-math') +
+          ' hasComponent=' + out.html.includes('组件渲染') +
+          ' hasQr=' + out.html.includes('data:image') )
+      } catch (error) {
+        console.log('[selftest] FAILED ' + (error && error.message ? error.message : error))
+      }
+    }, 2200)
+  }
+
+  const params = new URLSearchParams(location.search)
+  if (params.get('theme')) state.settings.themeId = params.get('theme')
+  if (params.get('code')) state.settings.codeThemeId = params.get('code')
+  if (params.get('font')) state.settings.fontFamily = params.get('font')
+  if (params.get('width') === 'phone') state.settings.articleWidth = 'phone'
+  if (params.get('mode')) state.settings.previewMode = params.get('mode')
+  if (params.get('provider')) state.settings.imageProvider = params.get('provider')
+  if (params.get('accent')) state.settings.accent = params.get('accent')
+  if (params.get('stats')) state.settings.showStats = params.get('stats') === '1'
+  if (params.get('dark') === '1') {
+    const root = document.documentElement
+    root.style.setProperty('--dsw-alias-bg-base', '#17161a')
+    root.style.setProperty('--dsw-alias-bg-layer-1', '#1e1d22')
+    root.style.setProperty('--dsw-alias-bg-layer-2', '#26252b')
+    root.style.setProperty('--dsw-alias-label-primary', '#ececf1')
+    root.style.setProperty('--dsw-alias-label-secondary', '#a6a5ae')
+    root.style.setProperty('--dsw-alias-border-l1', 'rgba(255,255,255,.09)')
+    root.style.setProperty('--dsw-alias-border-l2', 'rgba(255,255,255,.16)')
+    document.body.style.background = '#17161a'
+    if (params.get('wall') === '1' || params.get('wall') === 'light') document.body.style.background = 'transparent'
+  }
+  if (params.get('w')) {
+    const app = document.getElementById('app')
+    app.style.width = params.get('w') + 'px'
+    app.style.flex = 'none'
+    document.body.style.display = 'flex'
+    document.body.style.justifyContent = 'flex-start'
+  }
+
+  setTimeout(() => {
+    if (params.get('open') === 'themes') {
+      const button = document.querySelector('.mw-toolwide')
+      if (button) button.click()
+    }
+    if (params.get('open') === 'insert') {
+      const button = document.querySelector('.mw-toolwide--accent')
+      if (button) button.click()
+    }
+    if (params.get('open') === 'template') {
+      const button = document.querySelector('.mw-toolwide--accent')
+      if (button) button.click()
+      setTimeout(() => {
+        const entry = Array.from(document.querySelectorAll('.mw-menu button')).filter((item) => (item.textContent || '').includes('模板'))[0]
+        if (entry) entry.click()
+      }, 150)
+    }
+    if (params.get('open') === 'file') {
+      const button = document.querySelector('.mw-actions .mw-btn--ghost')
+      if (button) button.click()
+    }
+    if (params.get('open') === 'check') {
+      const button = document.querySelector('.mw-actions .mw-btn--ghost')
+      if (button) button.click()
+      setTimeout(() => {
+        const entry = Array.from(document.querySelectorAll('.mw-menu button')).filter((item) => (item.textContent || '').includes('发布前检查'))[0]
+        if (entry) entry.click()
+      }, 150)
+    }
+    if (params.get('open') === 'settings') {
+      const buttons = document.querySelectorAll('.mw-actions .mw-btn--icon')
+      if (buttons[1]) buttons[1].click()
+    }
+    if (params.get('openrail') === '1') {
+      const buttons = document.querySelectorAll('.mw-actions .mw-btn--icon')
+      if (buttons[0]) buttons[0].click()
+    }
+    if (params.get('pane') === 'preview') {
+      const tools = document.querySelectorAll('.mw-toolgroup--right .mw-tool')
+      if (tools.length > 0) tools[tools.length - 1].click()
+    }
+    if (params.get('scroll')) {
+      const stage = document.querySelector('.mw-stage')
+      if (stage) stage.scrollTop = Number(params.get('scroll'))
+    }
+    if (params.get('escroll')) {
+      const body = document.querySelector('.mw-editorbody')
+      if (body) body.scrollTop = Number(params.get('escroll'))
+    }
+  }, 700)
+
+  setTimeout(() => {
+    const root = document.querySelector('.mw-root')
+    const body = document.querySelector('.mw-body')
+    const preview = document.querySelector('.mw-preview')
+    const stage = document.querySelector('.mw-stage')
+    const paper = document.querySelector('.mw-paper')
+    const art = document.querySelector('.mdw-art')
+    const rect = (el) => (el === null ? 'null' : Math.round(el.getBoundingClientRect().width) + 'w/' + Math.round(el.getBoundingClientRect().right) + 'r')
+    const top = document.querySelector('.mw-top')
+    const actions = document.querySelector('.mw-actions')
+    const tools = document.querySelector('.mw-tools')
+    document.title = [
+      'root ' + rect(root),
+      'body ' + rect(body) + ' scroll ' + (body === null ? 0 : body.scrollWidth),
+      'preview ' + rect(preview),
+      'stage ' + rect(stage) + ' scroll ' + (stage === null ? 0 : stage.scrollWidth),
+      'paper ' + rect(paper),
+      'art ' + rect(art),
+      'top ' + rect(top) + ' scroll ' + (top === null ? 0 : top.scrollWidth),
+      'actions ' + rect(actions),
+      'tools ' + rect(tools) + ' scroll ' + (tools === null ? 0 : tools.scrollWidth),
+      'doc ' + document.documentElement.scrollWidth + '/' + document.documentElement.clientWidth + ' inner ' + window.innerWidth,
+    ].join(' | ')
+    console.log('[measure] ' + document.title)
+  }, 800)
+</script>
+</body>
+</html>

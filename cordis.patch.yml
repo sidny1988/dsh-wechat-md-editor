@@ -1,0 +1,6 @@
+# Host 半场挂载：插件本体即 Cordis 插件（index.js 导出 inject/apply）。
+# 同包 dsh.client 提供 Web 半场（client.js：左侧栏入口 + 整页排版工作台）。
+- insert:
+    - id: md-workbench
+      name: 'dsh-md-workbench'
+      config: {}

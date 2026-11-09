@@ -1,0 +1,43 @@
+{
+  "name": "dsh-md-workbench",
+  "displayName": "公众号MD编辑器",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "description": "公众号MD编辑器 · 面向微信公众号的 Markdown 写作与排版工具：实时预览、12 套主题、一键复制到公众号",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "vendor"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "jsdom": "^31.0.0",
+    "mathjax": "^3.2.2",
+    "mermaid": "^11.17.2",
+    "qrcode-generator": "^2.0.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

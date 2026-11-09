@@ -1,0 +1,27 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dev dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build client bundle
+        run: node build.mjs && node --check client.js
+      - name: Engine tests
+        run: node test/engine.test.mjs
+      - name: Feature tests
+        run: node test/features.test.mjs
+      - name: UI tests
+        run: node test/ui.test.mjs
+      - name: Copy tests
+        run: node test/copy.test.mjs

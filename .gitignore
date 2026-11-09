@@ -1,0 +1,8 @@
+node_modules/
+.chrome/
+.npm-cache/
+dist/
+test/shot*.png
+package-lock.json
+*.log
+.DS_Store
